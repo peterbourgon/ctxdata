@@ -25,7 +25,9 @@ and call whatever method is appropriate.
 
 ```go
 func otherHandler(w http.ResponseWriter, r *http.Request) {
-    ctxdata.From(r.Context()).Set("user", r.URL.Query().Get("user"))
+    d := ctxdata.From(r.Context())
+    d.Set("user", r.URL.Query().Get("user"))
+    d.Set("corrleation_id", r.Header.Get("X-Correlation-ID"))
     // ...
 }
 
