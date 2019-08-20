@@ -1,4 +1,4 @@
-# ctxdata
+# ctxdata [![GoDoc](https://godoc.org/github.com/peterbourgon/ctxdata?status.svg)](https://godoc.org/github.com/peterbourgon/ctxdata) [![builds.sr.ht status](https://builds.sr.ht/~peterbourgon/ctxdata.svg)](https://builds.sr.ht/~peterbourgon/ctxdata?)
 
 A helper for collecting and emitting metadata throughout a request lifecycle.
 

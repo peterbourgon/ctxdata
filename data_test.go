@@ -15,8 +15,6 @@ import (
 )
 
 func TestFromEmptyChaining(t *testing.T) {
-	var r *http.Request
-	r.URL.Query().Get("user")
 	for _, testcase := range []struct {
 		method string
 		exec   func(*ctxdata.Data) error
