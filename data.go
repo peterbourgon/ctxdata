@@ -106,6 +106,7 @@ func (d *Data) GetAll() (result map[string]string) {
 
 	result = make(map[string]string, len(d.dat))
 	for k, v := range d.dat {
+		println("### set", k, v)
 		result[k] = v
 	}
 	return result

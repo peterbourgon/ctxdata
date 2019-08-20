@@ -1,18 +1,22 @@
 package ctxdata_test
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
-	"reflect"
-	"sort"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/peterbourgon/ctxdata"
 )
 
 func TestFromEmptyChaining(t *testing.T) {
+	var r *http.Request
+	r.URL.Query().Get("user")
 	for _, testcase := range []struct {
 		method string
 		exec   func(*ctxdata.Data) error
@@ -62,36 +66,29 @@ func TestCallstack(t *testing.T) {
 
 	h = func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			ctxdata.From(r.Context()).Set("middleware_1", "b")
+			ctxdata.From(r.Context()).Set("middleware", "b")
 			next.ServeHTTP(w, r)
-			ctxdata.From(r.Context()).Set("middleware_2", "c")
 		})
 	}(h)
 
-	var results []string
+	var buf bytes.Buffer
 
-	h = func(next http.Handler) http.Handler {
+	h = func(next http.Handler, dst io.Writer) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ctx, d := ctxdata.New(r.Context())
-			d.Set("outer", "d")
+			defer func() { json.NewEncoder(dst).Encode(d.GetAll()) }()
 			next.ServeHTTP(w, r.WithContext(ctx))
-			d.Walk(func(key, value string) error {
-				results = append(results, fmt.Sprintf("%s=%s", key, value))
-				return nil
-			})
+			d.Set("outer", "c")
 		})
-	}(h)
+	}(h, &buf)
 
 	r, w := httptest.NewRequest("GET", "/", nil), httptest.NewRecorder()
 	h.ServeHTTP(w, r)
-	sort.Strings(results)
 
-	if want, have := []string{
-		"inner=a",
-		"middleware_1=b",
-		"middleware_2=c",
-		"outer=d",
-	}, results; !reflect.DeepEqual(want, have) {
+	want := map[string]string{"inner": "a", "middleware": "b", "outer": "c"}
+	var have map[string]string
+	json.NewDecoder(&buf).Decode(&have)
+	if !cmp.Equal(want, have) {
 		t.Fatalf("want %v, have %v", want, have)
 	}
 }
