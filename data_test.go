@@ -8,9 +8,9 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"testing"
 
-	"github.com/google/go-cmp/cmp"
 	"github.com/peterbourgon/ctxdata"
 )
 
@@ -86,7 +86,7 @@ func TestCallstack(t *testing.T) {
 	want := map[string]string{"inner": "a", "middleware": "b", "outer": "c"}
 	var have map[string]string
 	json.NewDecoder(&buf).Decode(&have)
-	if !cmp.Equal(want, have) {
+	if !reflect.DeepEqual(want, have) {
 		t.Fatalf("want %v, have %v", want, have)
 	}
 }
