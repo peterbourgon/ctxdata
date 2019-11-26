@@ -4,6 +4,7 @@ package ctxdata
 import (
 	"context"
 	"errors"
+	"sort"
 	"sync"
 )
 
@@ -26,8 +27,14 @@ type contextKey struct{}
 // metadata. At the end of the request, all metadata collected will be available
 // from any point in the callstack.
 type Data struct {
-	mtx sync.RWMutex
-	dat map[string]string
+	mtx   sync.RWMutex
+	data  map[string]pair
+	order int
+}
+
+type pair struct {
+	s string
+	i int
 }
 
 // New constructs a Data object and injects it into the provided context. Use
@@ -36,7 +43,7 @@ type Data struct {
 // the life of the request.
 func New(ctx context.Context) (context.Context, *Data) {
 	d := &Data{
-		dat: map[string]string{},
+		data: map[string]pair{},
 	}
 	return context.WithValue(ctx, contextKey{}, d), d
 }
@@ -61,7 +68,9 @@ func (d *Data) Set(key, value string) error {
 	d.mtx.Lock()
 	defer d.mtx.Unlock()
 
-	d.dat[key] = value
+	d.data[key] = pair{value, d.order}
+	d.order++
+
 	return nil
 }
 
@@ -74,8 +83,8 @@ func (d *Data) Get(key string) (value string, ok bool) {
 	d.mtx.RLock()
 	defer d.mtx.RUnlock()
 
-	value, ok = d.dat[key]
-	return value, ok
+	p, ok := d.data[key]
+	return p.s, ok
 }
 
 // GetDefault returns the value of key, or defaultValue if no value is
@@ -88,15 +97,16 @@ func (d *Data) GetDefault(key, defaultValue string) (value string) {
 	d.mtx.RLock()
 	defer d.mtx.RUnlock()
 
-	value, ok := d.dat[key]
+	p, ok := d.data[key]
 	if !ok {
 		return defaultValue
 	}
-	return value
+	return p.s
 }
 
-// GetAll returns a copy of all of the keys and values currently stored.
-func (d *Data) GetAll() (result map[string]string) {
+// GetAll returns a copy of all of the keys and values currently stored
+// as an unordered map.
+func (d *Data) GetAll() map[string]string {
 	if d == nil {
 		return nil
 	}
@@ -104,15 +114,40 @@ func (d *Data) GetAll() (result map[string]string) {
 	d.mtx.RLock()
 	defer d.mtx.RUnlock()
 
-	result = make(map[string]string, len(d.dat))
-	for k, v := range d.dat {
-		result[k] = v
+	result := make(map[string]string, len(d.data))
+	for k, p := range d.data {
+		result[k] = p.s
 	}
+
 	return result
 }
 
-// Walk calls fn for each key and value currently stored.
-// If fn returns a non-nil error, Walk aborts with that error.
+// KeyValue simply combines a key and its value.
+type KeyValue struct {
+	Key   string
+	Value string
+}
+
+// GetAllSlice returns a copy of all of the keys and values currently stored as
+// a slice of KeyValues, in the order they were added (set).
+func (d *Data) GetAllSlice() []KeyValue {
+	if d == nil {
+		return nil
+	}
+
+	d.mtx.RLock()
+	defer d.mtx.RUnlock()
+
+	result := make([]KeyValue, len(d.data))
+	for i, k := range d.orderedKeys() {
+		result[i] = KeyValue{k, d.data[k].s}
+	}
+
+	return result
+}
+
+// Walk calls fn for each key and value currently stored in the order they were
+// added (set). If fn returns a non-nil error, Walk aborts with that error.
 func (d *Data) Walk(fn func(key, value string) error) error {
 	if d == nil {
 		return ErrNilData
@@ -121,11 +156,29 @@ func (d *Data) Walk(fn func(key, value string) error) error {
 	d.mtx.RLock()
 	defer d.mtx.RUnlock()
 
-	for k, v := range d.dat {
-		if err := fn(k, v); err != nil {
+	for _, k := range d.orderedKeys() {
+		if err := fn(k, d.data[k].s); err != nil {
 			return err
 		}
 	}
 
 	return nil
+}
+
+func (d *Data) orderedKeys() []string {
+	intermediate := make([]pair, 0, len(d.data))
+	for k, p := range d.data {
+		intermediate = append(intermediate, pair{k, p.i})
+	}
+
+	sort.Slice(intermediate, func(i, j int) bool {
+		return intermediate[i].i < intermediate[j].i
+	})
+
+	result := make([]string, len(intermediate))
+	for i, p := range intermediate {
+		result[i] = p.s
+	}
+
+	return result
 }

@@ -90,3 +90,24 @@ func TestCallstack(t *testing.T) {
 		t.Fatalf("want %v, have %v", want, have)
 	}
 }
+
+func TestOrder(t *testing.T) {
+	_, d := ctxdata.New(context.Background())
+
+	d.Set("a", "1")
+	d.Set("b", "2")
+	d.Set("c", "3")
+	d.Set("a", "4")
+	d.Set("d", "5")
+
+	want := []ctxdata.KeyValue{
+		{"b", "2"},
+		{"c", "3"},
+		{"a", "4"},
+		{"d", "5"},
+	}
+
+	if have := d.GetAllSlice(); !reflect.DeepEqual(want, have) {
+		t.Fatalf("want %v, have %v", want, have)
+	}
+}
