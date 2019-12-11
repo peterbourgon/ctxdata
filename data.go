@@ -27,14 +27,14 @@ type contextKey struct{}
 // metadata. At the end of the request, all metadata collected will be available
 // from any point in the callstack.
 type Data struct {
-	mtx   sync.RWMutex
-	data  map[string]pair
-	order int
+	mtx  sync.RWMutex
+	data map[string]pair
+	seq  int
 }
 
 type pair struct {
-	s string
-	i int
+	val string
+	seq int
 }
 
 // New constructs a Data object and injects it into the provided context. Use
@@ -60,7 +60,7 @@ func From(ctx context.Context) *Data {
 }
 
 // Set key to value.
-func (d *Data) Set(key, value string) error {
+func (d *Data) Set(key string, value string) error {
 	if d == nil {
 		return ErrNilData
 	}
@@ -68,8 +68,8 @@ func (d *Data) Set(key, value string) error {
 	d.mtx.Lock()
 	defer d.mtx.Unlock()
 
-	d.data[key] = pair{value, d.order}
-	d.order++
+	d.data[key] = pair{value, d.seq}
+	d.seq++
 
 	return nil
 }
@@ -84,7 +84,7 @@ func (d *Data) Get(key string) (value string, ok bool) {
 	defer d.mtx.RUnlock()
 
 	p, ok := d.data[key]
-	return p.s, ok
+	return p.val, ok
 }
 
 // GetDefault returns the value of key, or defaultValue if no value is
@@ -101,12 +101,13 @@ func (d *Data) GetDefault(key, defaultValue string) (value string) {
 	if !ok {
 		return defaultValue
 	}
-	return p.s
+
+	return p.val
 }
 
-// GetAll returns a copy of all of the keys and values currently stored
+// Map returns a copy of all of the keys and values currently stored
 // as an unordered map.
-func (d *Data) GetAll() map[string]string {
+func (d *Data) Map() map[string]string {
 	if d == nil {
 		return nil
 	}
@@ -116,7 +117,7 @@ func (d *Data) GetAll() map[string]string {
 
 	result := make(map[string]string, len(d.data))
 	for k, p := range d.data {
-		result[k] = p.s
+		result[k] = p.val
 	}
 
 	return result
@@ -128,9 +129,9 @@ type KeyValue struct {
 	Value string
 }
 
-// GetAllSlice returns a copy of all of the keys and values currently stored as
+// Slice returns a copy of all of the keys and values currently stored as
 // a slice of KeyValues, in the order they were added (set).
-func (d *Data) GetAllSlice() []KeyValue {
+func (d *Data) Slice() []KeyValue {
 	if d == nil {
 		return nil
 	}
@@ -139,8 +140,8 @@ func (d *Data) GetAllSlice() []KeyValue {
 	defer d.mtx.RUnlock()
 
 	result := make([]KeyValue, len(d.data))
-	for i, k := range d.orderedKeys() {
-		result[i] = KeyValue{k, d.data[k].s}
+	for i, key := range d.orderedKeys() {
+		result[i] = KeyValue{key, d.data[key].val}
 	}
 
 	return result
@@ -157,7 +158,7 @@ func (d *Data) Walk(fn func(key, value string) error) error {
 	defer d.mtx.RUnlock()
 
 	for _, k := range d.orderedKeys() {
-		if err := fn(k, d.data[k].s); err != nil {
+		if err := fn(k, d.data[k].val); err != nil {
 			return err
 		}
 	}
@@ -168,16 +169,16 @@ func (d *Data) Walk(fn func(key, value string) error) error {
 func (d *Data) orderedKeys() []string {
 	intermediate := make([]pair, 0, len(d.data))
 	for k, p := range d.data {
-		intermediate = append(intermediate, pair{k, p.i})
+		intermediate = append(intermediate, pair{k, p.seq})
 	}
 
 	sort.Slice(intermediate, func(i, j int) bool {
-		return intermediate[i].i < intermediate[j].i
+		return intermediate[i].seq < intermediate[j].seq
 	})
 
 	result := make([]string, len(intermediate))
 	for i, p := range intermediate {
-		result[i] = p.s
+		result[i] = p.val
 	}
 
 	return result

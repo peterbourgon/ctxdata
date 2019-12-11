@@ -1,4 +1,4 @@
-# ctxdata [![GoDoc](https://godoc.org/github.com/peterbourgon/ctxdata?status.svg)](https://godoc.org/github.com/peterbourgon/ctxdata) [![builds.sr.ht status](https://builds.sr.ht/~peterbourgon/ctxdata.svg)](https://builds.sr.ht/~peterbourgon/ctxdata?)
+# ctxdata [![GoDoc](https://godoc.org/github.com/peterbourgon/ctxdata/v2?status.svg)](https://godoc.org/github.com/peterbourgon/ctxdata/v2) [![builds.sr.ht status](https://builds.sr.ht/~peterbourgon/ctxdata.svg)](https://builds.sr.ht/~peterbourgon/ctxdata?)
 
 A helper for collecting and emitting metadata throughout a request lifecycle.
 
@@ -7,6 +7,8 @@ constructor with the incoming request's context to construct a new, empty
 Data.
 
 ```go
+import "github.com/peterbourgon/ctxdata/v2"
+
 func handler(w http.ResponseWriter, r *http.Request) {
     ctx, d := ctxdata.New(r.Context())
 ```
@@ -57,7 +59,7 @@ to the dst at the end of each request.
 func logMiddleware(next http.Handler, dst io.Writer) http.Handler {
     return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
         ctx, d := ctxdata.New(r.Context())
-        defer func() { json.NewEncoder(dst).Encode(d.GetAll()) }()
+        defer func() { json.NewEncoder(dst).Encode(d.Map()) }()
         next.ServeHTTP(w, r.WithContext(ctx))
     })
 }

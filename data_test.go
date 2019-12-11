@@ -11,7 +11,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/peterbourgon/ctxdata"
+	"github.com/peterbourgon/ctxdata/v2"
 )
 
 func TestFromEmptyChaining(t *testing.T) {
@@ -36,8 +36,13 @@ func TestFromEmptyChaining(t *testing.T) {
 			want:   nil,
 		},
 		{
-			method: "GetAll",
-			exec:   func(d *ctxdata.Data) error { d.GetAll(); return nil },
+			method: "Map",
+			exec:   func(d *ctxdata.Data) error { d.Map(); return nil },
+			want:   nil,
+		},
+		{
+			method: "Slice",
+			exec:   func(d *ctxdata.Data) error { d.Slice(); return nil },
 			want:   nil,
 		},
 		{
@@ -74,7 +79,7 @@ func TestCallstack(t *testing.T) {
 	h = func(next http.Handler, dst io.Writer) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ctx, d := ctxdata.New(r.Context())
-			defer func() { json.NewEncoder(dst).Encode(d.GetAll()) }()
+			defer func() { json.NewEncoder(dst).Encode(d.Map()) }()
 			next.ServeHTTP(w, r.WithContext(ctx))
 			d.Set("outer", "c")
 		})
@@ -107,7 +112,7 @@ func TestOrder(t *testing.T) {
 		{"d", "5"},
 	}
 
-	if have := d.GetAllSlice(); !reflect.DeepEqual(want, have) {
+	if have := d.Slice(); !reflect.DeepEqual(want, have) {
 		t.Fatalf("want %v, have %v", want, have)
 	}
 }
