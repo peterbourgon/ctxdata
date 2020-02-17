@@ -1,4 +1,4 @@
-# ctxdata [![go.dev reference](https://img.shields.io/badge/go.dev-reference-007d9c?logo=go&logoColor=white&style=flat-square)](https://pkg.go.dev/github.com/peterbourgon/ctxdata/v2) ![Build Status](https://img.shields.io/endpoint.svg?url=https%3A%2F%2Factions-badge.atrox.dev%2Fpeterbourgon%2Fctxdata%2Fbadge&style=flat-square&label=build)](https://github.com/peterbourgon/ctxdata/actions?query=workflow%3ATest)
+# ctxdata [![go.dev reference](https://img.shields.io/badge/go.dev-reference-007d9c?logo=go&logoColor=white&style=flat-square)](https://pkg.go.dev/github.com/peterbourgon/ctxdata/v2) [![Build Status](https://img.shields.io/endpoint.svg?url=https%3A%2F%2Factions-badge.atrox.dev%2Fpeterbourgon%2Fctxdata%2Fbadge&style=flat-square&label=build)](https://github.com/peterbourgon/ctxdata/actions?query=workflow%3ATest)
 
 A helper for collecting and emitting metadata throughout a request lifecycle.
 
