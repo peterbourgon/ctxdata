@@ -15,6 +15,8 @@ import (
 )
 
 func TestFromEmptyChaining(t *testing.T) {
+	t.Parallel()
+
 	for _, testcase := range []struct {
 		method string
 		exec   func(*ctxdata.Data) error
@@ -60,6 +62,8 @@ func TestFromEmptyChaining(t *testing.T) {
 }
 
 func TestCallstack(t *testing.T) {
+	t.Parallel()
+
 	var h http.Handler
 
 	h = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -97,6 +101,8 @@ func TestCallstack(t *testing.T) {
 }
 
 func TestOrder(t *testing.T) {
+	t.Parallel()
+
 	_, d := ctxdata.New(context.Background())
 
 	d.Set("a", "1")

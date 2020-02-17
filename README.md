@@ -1,10 +1,10 @@
-# ctxdata [![GoDoc](https://godoc.org/github.com/peterbourgon/ctxdata?status.svg)](https://godoc.org/github.com/peterbourgon/ctxdata/v2) [![builds.sr.ht status](https://builds.sr.ht/~peterbourgon/ctxdata.svg)](https://builds.sr.ht/~peterbourgon/ctxdata?)
+# ctxdata [![go.dev reference](https://img.shields.io/badge/go.dev-reference-007d9c?logo=go&logoColor=white&style=flat-square)](https://pkg.go.dev/github.com/peterbourgon/ctxdata/v2) ![Build Status](https://img.shields.io/endpoint.svg?url=https%3A%2F%2Factions-badge.atrox.dev%2Fpeterbourgon%2Fctxdata%2Fbadge&style=flat-square&label=build)](https://github.com/peterbourgon/ctxdata/actions?query=workflow%3ATest)
 
 A helper for collecting and emitting metadata throughout a request lifecycle.
 
-When a new request arrives in your program, HTTP server, etc., use the New
-constructor with the incoming request's context to construct a new, empty
-Data.
+When a new request arrives in your program, HTTP server, etc., create a new Data
+value and inject it into the request context via
+[ctxdata.New](https://pkg.go.dev/github.com/peterbourgon/ctxdata?tab=doc#New).
 
 ```go
 import "github.com/peterbourgon/ctxdata/v2"
@@ -21,9 +21,10 @@ Use the returned context for all further operations on that request.
     // etc.
 ```
 
-Whenever you want to add metadata to the request Data, 
-use the From helper to fetch the Data from the context,
-and call whatever method is appropriate.
+Once the Data has been created and injected to the context, use
+[ctxdata.From](https://pkg.go.dev/github.com/peterbourgon/ctxdata?tab=doc#From)
+from any downstream function with access to the context to fetch it and add more
+metadata about the request.
 
 ```go
 func otherHandler(w http.ResponseWriter, r *http.Request) {
@@ -45,8 +46,8 @@ request's lifecycle will be available.
 
 ```go
     fmt.Fprintln(w, "OK")
-    
-    for k, v := range d {
+
+    for k, v := range d.GetAll() {
         log.Printf("%s: %s", k, v)
     }
 }
@@ -59,7 +60,7 @@ to the dst at the end of each request.
 func logMiddleware(next http.Handler, dst io.Writer) http.Handler {
     return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
         ctx, d := ctxdata.New(r.Context())
-        defer func() { json.NewEncoder(dst).Encode(d.Map()) }()
+        defer func() { json.NewEncoder(dst).Encode(d.GetAll()) }()
         next.ServeHTTP(w, r.WithContext(ctx))
     })
 }
