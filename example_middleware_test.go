@@ -9,48 +9,49 @@ import (
 	"github.com/peterbourgon/ctxdata/v3"
 )
 
-func ExampleNew_middleware() {
-	// Let h be any normal HTTP handler.
-	h := func(w http.ResponseWriter, r *http.Request) {
-		// Extract a data from the context.
-		d := ctxdata.From(r.Context())
+type Server struct{}
 
-		// Add information via Set.
-		d.Set("method", r.Method)
-		d.Set("path", r.URL.Path)
-		d.Set("content_length", r.ContentLength)
+func NewServer() *Server {
+	return &Server{}
+}
 
-		// Normal HTTP handler stuff.
-		fmt.Fprint(w, "OK")
-	}
+func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	d := ctxdata.From(r.Context())
+	d.Set("method", r.Method)
+	d.Set("path", r.URL.Path)
+	d.Set("content_length", r.ContentLength)
+	fmt.Fprintln(w, "OK")
+}
 
-	// In order for From to succeed in the handler, we first need to inject a
-	// data via New. Typically, we do that with a middleware.
-	middleware := func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// Inject the data to the context.
-			ctx, d := ctxdata.New(r.Context())
+type Middleware struct {
+	next http.Handler
+}
 
-			// Use the returned context in the next handler.
-			next.ServeHTTP(w, r.WithContext(ctx))
+func NewMiddleware(next http.Handler) *Middleware {
+	return &Middleware{next: next}
+}
 
-			// All metadata set in all downstream handlers is available to us.
-			for _, kv := range d.GetAllSlice() {
-				fmt.Printf("%s: %v\n", kv.Key, kv.Val)
-			}
-		})
-	}
+func (mw *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx, d := ctxdata.New(r.Context())
 
-	// A mock server, request, and response recorder.
-	var (
-		server = middleware(http.HandlerFunc(h))
-		req    = httptest.NewRequest("GET", "/path", strings.NewReader("request body"))
-		rec    = httptest.NewRecorder()
-	)
-	server.ServeHTTP(rec, req)
+	defer func() {
+		for _, kv := range d.GetAllSlice() {
+			fmt.Printf("%s: %v\n", kv.Key, kv.Val)
+		}
+	}()
+
+	mw.next.ServeHTTP(w, r.WithContext(ctx))
+}
+
+func Example_middleware() {
+	server := NewServer()
+	middleware := NewMiddleware(server)
+	testserver := httptest.NewServer(middleware)
+	defer testserver.Close()
+	http.Post(testserver.URL+"/path", "text/plain; charset=utf-8", strings.NewReader("hello world"))
 
 	// Output:
-	// method: GET
+	// method: POST
 	// path: /path
-	// content_length: 12
+	// content_length: 11
 }

@@ -4,6 +4,8 @@ package ctxdata
 import (
 	"context"
 	"errors"
+	"fmt"
+	"reflect"
 )
 
 // KeyVal combines a string key with its abstract value into a single tuple.
@@ -131,4 +133,33 @@ func (d *Data) GetAllMap() map[string]interface{} {
 		m[kv.Key] = kv.Val
 	}
 	return m
+}
+
+// ErrIncompatibleType is returned by GetAs if the value associated with a key
+// isn't assignable to the provided target.
+var ErrIncompatibleType = errors.New("incompatible type")
+
+// GetAs will try to assign the value associated with key to target. Target must
+// be a pointer to an assignable type. GetAs will return ErrNotFound if the key
+// is not found, and ErrIncompatibleType if the found value is not assignable to
+// target.
+func (d *Data) GetAs(key string, target interface{}) error {
+	val, err := d.Get(key)
+	if err != nil {
+		return err
+	}
+
+	v := reflect.ValueOf(target)
+	t := v.Type()
+	if t.Kind() != reflect.Ptr || v.IsNil() {
+		return fmt.Errorf("val must be a non-nil pointer")
+	}
+
+	targetType := t.Elem()
+	if !reflect.TypeOf(val).AssignableTo(targetType) {
+		return ErrIncompatibleType
+	}
+
+	v.Elem().Set(reflect.ValueOf(val))
+	return nil
 }
