@@ -4,53 +4,45 @@ package ctxdata
 import (
 	"context"
 	"errors"
-	"sort"
-	"sync"
 )
 
-// ErrNilData is returned by certain methods on the Data type when they're
-// called with a nil pointer receiver. This can happen when methods are chained
-// with the From helper, and indicates a Data object wasn't found in the
-// context.
-var ErrNilData = errors.New("nil data (no data in context?)")
+// KeyVal combines a string key with its abstract value into a single tuple.
+// It's used internally, and as a return type for GetSlice.
+type KeyVal struct {
+	Key string
+	Val interface{}
+}
 
-type contextKey struct{}
-
-// Data is an opaque type that can be injected into a context at the start of a
-// request, updated with metadata over the course of the request, and queried at
-// the end of the request for collected metadata.
+// Data is an opaque type that can be injected into a context at e.g. the start
+// of a request, updated with metadata over the course of the request, and then
+// queried at the end of the request.
 //
 // When a new request arrives in your program, HTTP server, etc., use the New
 // constructor with the incoming request's context to construct a new, empty
-// Data. Use the returned context for all further operations on that request,
-// and use the From helper to retrieve the request's Data and set or get
-// metadata. At the end of the request, all metadata collected will be available
-// from any point in the callstack.
+// Data. Use the returned context for all further operations on that request.
+// Use the From helper function to retrieve a previously-injected Data from a
+// context, and set or get metadata. At the end of the request, all metadata
+// collected will be available from any point in the callstack.
 type Data struct {
-	mtx  sync.RWMutex
-	data map[string]pair
-	seq  int
-}
-
-type pair struct {
-	val string
-	seq int
+	c chan []KeyVal
 }
 
 // New constructs a Data object and injects it into the provided context. Use
-// the returned context for all further operations in this request lifecycle.
-// The returned Data object can be directly queried for metadata collected over
-// the life of the request.
+// the returned context for all further operations. The returned Data can be
+// queried at any point for metadata collected over the life of the context.
 func New(ctx context.Context) (context.Context, *Data) {
-	d := &Data{
-		data: map[string]pair{},
-	}
+	c := make(chan []KeyVal, 1)
+	c <- make([]KeyVal, 0, 32)
+	d := &Data{c: c}
 	return context.WithValue(ctx, contextKey{}, d), d
 }
 
-// From extracts a Data object from the provided context. If no Data object was
+type contextKey struct{}
+
+// From extracts a Data from the provided context. If no Data object was
 // injected to the context, the returned pointer will be nil, but all Data
-// methods gracefully handle this situation, so it's safe to chain.
+// methods gracefully handle this condition, so it's safe to consider the
+// returned value always valid.
 func From(ctx context.Context) *Data {
 	v := ctx.Value(contextKey{})
 	if v == nil {
@@ -59,127 +51,84 @@ func From(ctx context.Context) *Data {
 	return v.(*Data)
 }
 
-// Set key to value.
-func (d *Data) Set(key string, value string) error {
+// ErrNoData is returned by accessor methods when they're called on a nil
+// pointer receiver. This typically means From was called on a context that
+// didn't have a Data injected into it previously via New.
+var ErrNoData = errors.New("no data in context")
+
+// Set key to val. If key already exists, it will be overwritten. If this method
+// is called on a nil Data pointer, it returns ErrNoData.
+func (d *Data) Set(key string, val interface{}) error {
 	if d == nil {
-		return ErrNilData
+		return ErrNoData
 	}
 
-	d.mtx.Lock()
-	defer d.mtx.Unlock()
+	s := <-d.c
+	defer func() { d.c <- s }()
 
-	d.data[key] = pair{value, d.seq}
-	d.seq++
-
-	return nil
-}
-
-// Get the value of key.
-func (d *Data) Get(key string) (value string, ok bool) {
-	if d == nil {
-		return "", false
-	}
-
-	d.mtx.RLock()
-	defer d.mtx.RUnlock()
-
-	p, ok := d.data[key]
-	return p.val, ok
-}
-
-// GetDefault returns the value of key, or defaultValue if no value is
-// available.
-func (d *Data) GetDefault(key, defaultValue string) (value string) {
-	if d == nil {
-		return defaultValue
-	}
-
-	d.mtx.RLock()
-	defer d.mtx.RUnlock()
-
-	p, ok := d.data[key]
-	if !ok {
-		return defaultValue
-	}
-
-	return p.val
-}
-
-// Map returns a copy of all of the keys and values currently stored
-// as an unordered map.
-func (d *Data) Map() map[string]string {
-	if d == nil {
-		return nil
-	}
-
-	d.mtx.RLock()
-	defer d.mtx.RUnlock()
-
-	result := make(map[string]string, len(d.data))
-	for k, p := range d.data {
-		result[k] = p.val
-	}
-
-	return result
-}
-
-// KeyValue simply combines a key and its value.
-type KeyValue struct {
-	Key   string
-	Value string
-}
-
-// Slice returns a copy of all of the keys and values currently stored as
-// a slice of KeyValues, in the order they were added (set).
-func (d *Data) Slice() []KeyValue {
-	if d == nil {
-		return nil
-	}
-
-	d.mtx.RLock()
-	defer d.mtx.RUnlock()
-
-	result := make([]KeyValue, len(d.data))
-	for i, key := range d.orderedKeys() {
-		result[i] = KeyValue{key, d.data[key].val}
-	}
-
-	return result
-}
-
-// Walk calls fn for each key and value currently stored in the order they were
-// added (set). If fn returns a non-nil error, Walk aborts with that error.
-func (d *Data) Walk(fn func(key, value string) error) error {
-	if d == nil {
-		return ErrNilData
-	}
-
-	d.mtx.RLock()
-	defer d.mtx.RUnlock()
-
-	for _, k := range d.orderedKeys() {
-		if err := fn(k, d.data[k].val); err != nil {
-			return err
+	for i := range s {
+		if s[i].Key == key {
+			s[i].Val = val
+			s = append(s[:i], append(s[i+1:], s[i])...)
+			return nil
 		}
 	}
 
+	s = append(s, KeyVal{key, val})
 	return nil
 }
 
-func (d *Data) orderedKeys() []string {
-	intermediate := make([]pair, 0, len(d.data))
-	for k, p := range d.data {
-		intermediate = append(intermediate, pair{k, p.seq})
+// ErrNotFound is returned by Get when the key isn't present.
+var ErrNotFound = errors.New("key not found")
+
+// Get the value associated with key, or return ErrNotFound. If this method is
+// called on a nil Data pointer, it returns ErrNoData.
+func (d *Data) Get(key string) (val interface{}, err error) {
+	if d == nil {
+		return nil, ErrNoData
 	}
 
-	sort.Slice(intermediate, func(i, j int) bool {
-		return intermediate[i].seq < intermediate[j].seq
-	})
+	s := <-d.c
+	defer func() { d.c <- s }()
 
-	result := make([]string, len(intermediate))
-	for i, p := range intermediate {
-		result[i] = p.val
+	for _, kv := range s {
+		if kv.Key == key {
+			return kv.Val, nil
+		}
 	}
 
-	return result
+	return nil, ErrNotFound
+}
+
+// GetAllSlice returns a slice of key/value pairs in the order in which they
+// were set. If this method is called on a nil Data pointer, it returns
+// ErrNoData.
+func (d *Data) GetAllSlice() []KeyVal {
+	if d == nil {
+		return nil
+	}
+
+	s := <-d.c
+	defer func() { d.c <- s }()
+
+	r := make([]KeyVal, len(s))
+	copy(r, s)
+	return r
+}
+
+// GetAllMap returns a map of key to value. If this method is called on a nil
+// Data pointer, it returns ErrNoData.
+func (d *Data) GetAllMap() map[string]interface{} {
+	if d == nil {
+		return map[string]interface{}{}
+	}
+
+	s := <-d.c
+	defer func() { d.c <- s }()
+
+	m := make(map[string]interface{}, len(s))
+	for _, kv := range s {
+		m[kv.Key] = kv.Val
+	}
+	return m
 }
