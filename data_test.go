@@ -231,3 +231,45 @@ func TestConcurrency(t *testing.T) {
 
 	t.Logf("n: %d", d.GetUint64("n", 0))
 }
+
+func TestGetAs(t *testing.T) {
+	t.Parallel()
+
+	type foo struct {
+		s string
+		i int
+	}
+
+	_, d := ctxdata.New(context.Background())
+	d.Set("foo", foo{s: "hello", i: 101})
+
+	var f foo
+	if want, have := error(nil), d.GetAs("foo", &f); want != have {
+		t.Fatalf("GetAs(foo, &f): want error %v, have %v", want, have)
+	}
+	if want, have := "hello", f.s; want != have {
+		t.Errorf("f.s: want %q, have %q", want, have)
+	}
+	if want, have := 101, f.i; want != have {
+		t.Errorf("f.i: want %d, have %d", want, have)
+	}
+
+	type bar struct {
+		_ string
+		_ int
+	}
+	var b bar
+	if want, have := ctxdata.ErrIncompatibleType, d.GetAs("foo", &b); want != have {
+		t.Fatalf("GetAs(foo, &b): want %v, have %v", want, have)
+	}
+
+	type baz struct {
+		_ string
+		_ int
+		_ float64
+	}
+	var z baz
+	if want, have := ctxdata.ErrIncompatibleType, d.GetAs("foo", &z); want != have {
+		t.Fatalf("GetAs(foo, &z): want %v, have %v", want, have)
+	}
+}
