@@ -255,8 +255,8 @@ func TestGetAs(t *testing.T) {
 	}
 
 	type bar struct {
-		s string
-		i int
+		_ string
+		_ int
 	}
 	var b bar
 	if want, have := ctxdata.ErrIncompatibleType, d.GetAs("foo", &b); want != have {
@@ -264,9 +264,9 @@ func TestGetAs(t *testing.T) {
 	}
 
 	type baz struct {
-		s string
-		i int
-		f float64
+		_ string
+		_ int
+		_ float64
 	}
 	var z baz
 	if want, have := ctxdata.ErrIncompatibleType, d.GetAs("foo", &z); want != have {
