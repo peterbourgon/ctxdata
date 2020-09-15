@@ -60,7 +60,7 @@ to the dst at the end of each request.
 func logMiddleware(next http.Handler, dst io.Writer) http.Handler {
     return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
         ctx, d := ctxdata.New(r.Context())
-        defer func() { json.NewEncoder(dst).Encode(d.GetMap()) }()
+        defer func() { json.NewEncoder(dst).Encode(d.GetAllMap()) }()
         next.ServeHTTP(w, r.WithContext(ctx))
     })
 }
