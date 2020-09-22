@@ -47,7 +47,7 @@ request's lifecycle will be available.
 ```go
     fmt.Fprintln(w, "OK")
 
-    for _, kv := range d.GetSlice() {
+    for _, kv := range d.GetAllSlice() {
         log.Printf("%s: %s", kv.Key, kv.Val)
     }
 }
