@@ -1,3 +1,3 @@
-module github.com/peterbourgon/ctxdata/v3
+module github.com/peterbourgon/ctxdata/v4
 
-go 1.14
+go 1.15

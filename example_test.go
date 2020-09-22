@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/peterbourgon/ctxdata/v3"
+	"github.com/peterbourgon/ctxdata/v4"
 )
 
 // This example demonstrates how to use GetAs to retrieve metadata into an

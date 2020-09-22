@@ -6,7 +6,7 @@ import (
 	"net/http/httptest"
 	"strings"
 
-	"github.com/peterbourgon/ctxdata/v3"
+	"github.com/peterbourgon/ctxdata/v4"
 )
 
 type Server struct{}
